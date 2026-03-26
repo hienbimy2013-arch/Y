@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lê Quý Đôn - Đại Khoa Toàn Thư</title>
+    <style>
+        :root {
+            --giay-do: #f4e4bc;
+            --muc-tau: #2c1e12;
+            --do-an: #b22222;
+            --xanh-an: #1e5631;
+            --vien-dong: #8b4513;
+        }
+
+        body {
+            background-color: #1a120b;
+            color: var(--muc-tau);
+            font-family: "Palatino Linotype", serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            background: var(--giay-do);
+            border: 8px double var(--vien-dong);
+            width: 92%;
+            max-width: 380px;
+            height: 90vh;
+            position: relative;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .corner-deco { position: absolute; font-size: 20px; opacity: 0.4; color: var(--vien-dong); z-index: 5; }
+        .top-left { top: 5px; left: 5px; } .top-right { top: 5px; right: 5px; }
+
+        .page-wrap { flex-grow: 1; display: flex; flex-direction: column; transition: all 0.6s ease; }
+        .page-fade-out { opacity: 0; transform: translateY(-20px); }
+        .page-fade-in { animation: fadeIn 0.6s forwards; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        #welcome-screen {
+            position: absolute; inset: 0; background: var(--giay-do);
+            z-index: 100; padding: 30px; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+        }
+
+        .question-area { flex-grow: 1; padding: 15px 25px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        #q-text { font-size: 1.15em; line-height: 1.5; font-weight: bold; margin-bottom: 15px; }
+
+        /* Các kiểu nút bấm */
+        .controls { padding: 15px; display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
+        .grid-abcd { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+        
+        button {
+            padding: 12px; font-size: 0.95em; font-weight: bold; border: none; border-radius: 6px;
+            cursor: pointer; color: white; transition: 0.2s;
+        }
+        .btn-true { background: #1e5631; } .btn-false { background: #8b0000; }
+        .btn-abcd { background: #5d2e0d; font-size: 0.85em; }
+        .btn-gold { background: var(--vien-dong); width: 100%; }
+
+        /* Ô nhập liệu cho câu đục lỗ */
+        #fill-input {
+            width: 100%; padding: 12px; border: 2px solid var(--vien-dong);
+            background: rgba(255,255,255,0.5); font-family: inherit; font-size: 1.1em;
+            text-align: center; margin-bottom: 10px; border-radius: 4px;
+        }
+
+        #seal {
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            width: 160px; height: 160px; border: 4px solid var(--do-an); border-radius: 50%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: var(--do-an); font-weight: bold; opacity: 0; z-index: 50;
+            background: rgba(244, 228, 188, 0.9); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .show-seal { transform: translate(-50%, -50%) scale(1) rotate(-12deg) !important; opacity: 1 !important; }
+
+        .status-bar { font-size: 0.8em; padding: 8px; text-align: center; border-top: 1px dashed var(--vien-dong); background: rgba(0,0,0,0.02); }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="corner-deco top-left">💮</div>
+    <div class="corner-deco top-right">🌸</div>
+
+    <div id="seal">
+        <div style="font-size: 20px;">🖋️</div>
+        <div id="seal-text">SĨ TỬ LÀM ĐÚNG</div>
+    </div>
+
+    <div id="welcome-screen">
+        <div style="font-size: 40px;">📜</div>
+        <h2 style="color:var(--vien-dong);">ĐẠI KHOA TOÀN THƯ</h2>
+        <p style="font-size: 0.9em; font-style: italic;">"Khám phá tri thức cùng bậc danh nhân kiệt xuất Lê Quý Đôn qua 30 thử thách cam go."</p>
+        <button class="btn-gold" onclick="startGame()">⚔️ KHỞI SỰ</button>
+    </div>
+
+    <div class="page-wrap" id="page-content">
+        <div class="status-bar" style="border-bottom: 1px dashed var(--vien-dong); border-top: none;">
+             📖 CÂU HỎI: <span id="current">1</span>/30
+        </div>
+
+        <div class="question-area">
+            <div id="q-text">Đang mài mực...</div>
+            <div id="input-zone" style="width: 100%;"></div>
+        </div>
+
+        <div class="controls" id="control-zone"></div>
+
+        <div class="status-bar">
+            ✨ ĐIỂM VÀNG: <span id="score">0</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        // 20 CÂU ĐÚNG SAI (Lược trích)
+        { type: 'tf', q: "Lê Quý Đôn quê ở Thái Bình, tên thuở nhỏ là Lê Danh Phương?", a: true },
+        { type: 'tf', q: "Ông thi đỗ Bảng Nhãn vào năm 1752?", a: true },
+        { type: 'tf', q: "Ông là tác giả của bộ 'Vân đài loại ngữ'?", a: true },
+        { type: 'tf', q: "Lê Quý Đôn từng đi sứ sang Nhật Bản?", a: false },
+        { type: 'tf', q: "Ông được mệnh danh là 'Túi khôn của thời đại'?", a: true },
+        { type: 'tf', q: "Cuốn 'Phủ biên tạp lục' chép về vùng Thuận Hóa, Quảng Nam?", a: true },
+        { type: 'tf', q: "Ông sống vào thời nhà Lý?", a: false },
+        { type: 'tf', q: "Gia đình ông có truyền thống khoa bảng nổi tiếng?", a: true },
+        { type: 'tf', q: "Ông từng giữ chức Thượng thư bộ Hộ?", a: true },
+        { type: 'tf', q: "Ông qua đời tại quê hương Thái Bình?", a: false },
+        { type: 'tf', q: "Ông đỗ Giải nguyên kỳ thi Hương khi mới 18 tuổi?", a: true },
+        { type: 'tf', q: "Kiến văn tiểu lục là cuốn sách về địa lý thuần túy?", a: false },
+        { type: 'tf', q: "Ông từng làm quan Hiệp trấn tại xứ Nghệ An?", a: true },
+        { type: 'tf', q: "Ông có kiến thức rộng về Thiên văn và Lịch pháp?", a: true },
+        { type: 'tf', q: "Ông là người biên soạn 'Đại Việt thông sử'?", a: true },
+        { type: 'tf', q: "Lê Quý Đôn từng đề xuất cải cách thuế khóa?", a: true },
+        { type: 'tf', q: "Ông thi đỗ Trạng Nguyên?", a: false },
+        { type: 'tf', q: "Ông từng sang nhà Thanh và được sĩ phu Trung Hoa nể trọng?", a: true },
+        { type: 'tf', q: "Ông mất năm 1784?", a: true },
+        { type: 'tf', q: "Lê Quý Đôn là nhà bác học lớn nhất thời phong kiến?", a: true },
+
+        // 5 CÂU TRẮC NGHIỆM ABCD
+        { type: 'abcd', q: "Lê Quý Đôn đỗ học vị cao nhất là gì?", options: ["Trạng nguyên", "Bảng nhãn", "Thám hoa", "Hoàng giáp"], a: "Bảng nhãn" },
+        { type: 'abcd', q: "Tác phẩm nào của ông được coi là bách khoa toàn thư đầu tiên?", options: ["Đại Việt sử ký", "Vân đài loại ngữ", "Phủ biên tạp lục", "Quần thư khảo biện"], a: "Vân đài loại ngữ" },
+        { type: 'abcd', q: "Ông đi sứ phương Bắc vào năm nào?", options: ["1750", "1760", "1770", "1780"], a: "1760" },
+        { type: 'abcd', q: "Lê Quý Đôn làm quan dưới triều đại nào?", options: ["Nhà Mạc", "Nhà Tây Sơn", "Lê Trung Hưng", "Nhà Nguyễn"], a: "Lê Trung Hưng" },
+        { type: 'abcd', q: "Câu nói nổi tiếng nào sau đây là của ông?", options: ["Phi nông bất phú", "Tiên học lễ", "Dân vi quý", "Quốc dĩ dân vi bản"], a: "Phi nông bất phú" },
+
+        // 5 CÂU ĐỤC LỖ
+        { type: 'fill', q: "Thiên hạ vô tri vấn Lê ... Đôn", a: "Quý" },
+        { type: 'fill', q: "Cuốn sách chép về vùng Thuận Hóa có tên là Phủ biên ... lục", a: "tạp" },
+        { type: 'fill', q: "Lê Quý Đôn sinh ra tại huyện Diên Hà, tỉnh ...", a: "Thái Bình" },
+        { type: 'fill', q: "Ông được tôn vinh là nhà ... học lớn nhất Việt Nam.", a: "bác" },
+        { type: 'fill', q: "Bộ sử lớn do ông biên soạn mang tên Đại Việt ... sử.", a: "thông" }
+    ];
+
+    let currentIdx = 0;
+    let score = 0;
+
+    function startGame() {
+        document.getElementById('welcome-screen').style.display = 'none';
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        const page = document.getElementById('page-content');
+        page.classList.remove('page-fade-out', 'page-fade-in');
+        void page.offsetWidth; 
+        page.classList.add('page-fade-in');
+
+        const q = questions[currentIdx];
+        document.getElementById('q-text').innerText = q.q;
+        document.getElementById('current').innerText = currentIdx + 1;
+        
+        const controlZone = document.getElementById('control-zone');
+        const inputZone = document.getElementById('input-zone');
+        controlZone.innerHTML = '';
+        inputZone.innerHTML = '';
+
+        if (q.type === 'tf') {
+            controlZone.innerHTML = `
+                <button class="btn-true" onclick="checkAnswer(true)">✅ ĐÚNG</button>
+                <button class="btn-false" onclick="checkAnswer(false)">❌ SAI</button>
+            `;
+        } else if (q.type === 'abcd') {
+            let html = '<div class="grid-abcd">';
+            q.options.forEach(opt => {
+                html += `<button class="btn-abcd" onclick="checkAnswer('${opt}')">${opt}</button>`;
+            });
+            html += '</div>';
+            controlZone.innerHTML = html;
+        } else if (q.type === 'fill') {
+            inputZone.innerHTML = `<input type="text" id="fill-input" placeholder="Điền từ...">`;
+            controlZone.innerHTML = `<button class="btn-gold" onclick="checkAnswer(document.getElementById('fill-input').value)">NỘP BÀI</button>`;
+        }
+    }
+
+    function checkAnswer(userAns) {
+        const q = questions[currentIdx];
+        let correct = false;
+
+        if (q.type === 'fill') {
+            correct = userAns.trim().toLowerCase() === q.a.toLowerCase();
+        } else {
+            correct = userAns === q.a;
+        }
+
+        const seal = document.getElementById('seal');
+        const sealText = document.getElementById('seal-text');
+        
+        sealText.innerText = correct ? "SĨ TỬ\nLÀM ĐÚNG" : "SĨ TỬ CẦN\nCỐ GẮNG THÊM";
+        seal.style.color = correct ? "var(--xanh-an)" : "var(--do-an)";
+        seal.style.borderColor = correct ? "var(--xanh-an)" : "var(--do-an)";
+        seal.classList.add('show-seal');
+
+        if (correct) score++;
+        document.getElementById('score').innerText = score;
+
+        setTimeout(() => {
+            seal.classList.remove('show-seal');
+            document.getElementById('page-content').classList.add('page-fade-out');
+            setTimeout(() => {
+                currentIdx++;
+                if (currentIdx < questions.length) loadQuestion();
+                else endGame();
+            }, 600);
+        }, 1200);
+    }
+
+    function endGame() {
+        document.getElementById('game-container').innerHTML = `
+            <div style="padding:30px; text-align:center; height:100%; display:flex; flex-direction:column; justify-content:center;">
+                <div style="font-size: 50px;">🏆</div>
+                <h2 style="color:var(--vien-dong)">HOÀN THÀNH KHẢO THÍ</h2>
+                <div style="font-size:3em; margin:15px 0;">${score}/30</div>
+                <p>Sĩ tử đã chứng tỏ bản lĩnh tri thức trước nhà bác học Lê Quý Đôn.</p>
+                <button class="btn-gold" onclick="location.reload()">🔄 THI LẠI</button>
+            </div>
+        `;
+    }
+</script>
+
+</body>
+</html>
